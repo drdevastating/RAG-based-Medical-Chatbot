@@ -29,11 +29,11 @@ PINECONE_CLOUD = "aws"
 PINECONE_REGION = "us-east-1"
 
 # Embeddings Configuration
-EMBEDDINGS_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Text Splitting Configuration
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 200
 
 # Retriever Configuration
 RETRIEVER_K = 5  # Number of documents to retrieve

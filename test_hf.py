@@ -1,21 +1,32 @@
-from huggingface_hub import InferenceClient
-import os
-from dotenv import load_dotenv
+# test_hf.py
+"""
+Test Hugging Face LLM directly (NO RAG)
+Compares raw model response vs HaleAI
+"""
+from llm_handler import LLMHandler
+from config import LLM_MODEL
 
-load_dotenv()
+print("Testing Hugging Face LLM (NO RAG)...")
+print("="*60)
 
-client = InferenceClient(
-    model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-    token=os.getenv("HF_TOKEN")
-)
+# Initialize LLM handler
+llm = LLMHandler()
 
-# New-style chat/completion API
-response = client.chat.completions.create(
-    model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-    messages=[
-        {"role": "user", "content": "Blood is coming while fapping?"}
-    ],
-)
+# Test questions
+questions = [
+    "what I should do"
+    ]
 
-# print the model's reply
-print(response.choices[0].message["content"])
+for q in questions:
+    print(f"\nQ: {q}")
+    print("-" * 50)
+    
+    # Raw LLM response (no context)
+    prompt = f"Question: {q}\nAnswer briefly:"
+    try:
+        raw_answer = llm.generate(prompt)
+        print(f"RAW LLM: {raw_answer}")
+    except Exception as e:
+        print(f"ERROR: {e}")
+    
+    print("-" * 50)

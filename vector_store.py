@@ -85,3 +85,12 @@ class VectorStoreManager:
         for i, doc in enumerate(docs, 1):
             print(f"  Doc {i}: {doc.page_content[:80]}...")
         return docs
+    
+    def delete_index(self):
+        """Delete the entire Pinecone index (use with caution)"""
+        if self.pc.has_index(self.index_name):
+            print(f"Deleting index: {self.index_name}")
+            self.pc.delete_index(self.index_name)
+            print(f"Index {self.index_name} deleted")
+        else:
+            print(f"Index {self.index_name} does not exist")
