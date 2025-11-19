@@ -3,8 +3,8 @@
 Test Hugging Face LLM directly (NO RAG)
 Compares raw model response vs HaleAI
 """
-from llm_handler import LLMHandler
-from config import LLM_MODEL
+from backend.llm_handler import LLMHandler
+from backend.config import LLM_MODEL
 
 print("Testing Hugging Face LLM (NO RAG)...")
 print("="*60)

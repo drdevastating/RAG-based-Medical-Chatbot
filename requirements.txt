@@ -33,3 +33,7 @@ flake8>=6.0.0
 # Additional utilities
 tqdm>=4.65.0  # Progress bars
 colorlog>=6.7.0  # Colored logging
+
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+psutil==5.9.6

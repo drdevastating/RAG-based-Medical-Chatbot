@@ -1,5 +1,5 @@
 # test.py
-from chatbot import HaleAI
+from backend.chatbot import HaleAI
 bot = HaleAI()
 bot.connect()
 
