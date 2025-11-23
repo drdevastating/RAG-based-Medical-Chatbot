@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Moon, Sun, Activity, MessageSquare, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Send, Moon, Sun, Activity, MessageSquare, AlertCircle, CheckCircle, X, BarChart3, MessageCircle, FileText } from 'lucide-react';
+
+// Markdown Parser Component
+const MarkdownText = ({ text }) => {
+  const parseMarkdown = (text) => {
+    // Replace **bold** with <strong>
+    let parsed = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Replace *italic* with <em>
+    parsed = parsed.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Replace line breaks
+    parsed = parsed.replace(/\n/g, '<br/>');
+    return parsed;
+  };
+
+  return (
+    <div 
+      dangerouslySetInnerHTML={{ __html: parseMarkdown(text) }}
+      className="whitespace-pre-wrap"
+    />
+  );
+};
 
 const HaleAIFrontend = () => {
   const [messages, setMessages] = useState([]);
@@ -7,7 +27,7 @@ const HaleAIFrontend = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
-  const [showMetrics, setShowMetrics] = useState(false);
+  const [currentPage, setCurrentPage] = useState('chat'); // 'chat' or 'analytics'
   const [metrics, setMetrics] = useState({
     totalRequests: 0,
     avgResponseTime: 0,
@@ -19,6 +39,7 @@ const HaleAIFrontend = () => {
   });
   const messagesEndRef = useRef(null);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [selectedSources, setSelectedSources] = useState([]);
 
   // Check backend connection
   useEffect(() => {
@@ -63,6 +84,7 @@ const HaleAIFrontend = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setSelectedSources([]);
 
     const loadingMessage = { role: 'assistant', content: '...', isLoading: true };
     setMessages(prev => [...prev, loadingMessage]);
@@ -85,13 +107,20 @@ const HaleAIFrontend = () => {
       const data = await response.json();
       const responseTime = Date.now() - startTime;
 
-      setMessages(prev => prev.slice(0, -1).concat({
+      const assistantMessage = {
         role: 'assistant',
         content: data.answer,
-        sources: data.sources,
+        sources: data.sources || [],
         metadata: data.metadata,
         timestamp: new Date()
-      }));
+      };
+
+      setMessages(prev => prev.slice(0, -1).concat(assistantMessage));
+      
+      // Set sources for display
+      if (data.sources && data.sources.length > 0) {
+        setSelectedSources(data.sources);
+      }
 
       setMetrics(prev => ({
         ...prev,
@@ -124,8 +153,112 @@ const HaleAIFrontend = () => {
     return `${hours}h ${minutes}m`;
   };
 
+  // Render Analytics Page
+  if (currentPage === 'analytics') {
+    return (
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-green-50'}`}>
+        {/* Header */}
+        <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b shadow-sm`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-br from-blue-600 to-green-600 p-3 rounded-xl">
+                  <BarChart3 className="text-white" size={28} />
+                </div>
+                <div>
+                  <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Analytics Dashboard
+                  </h1>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    System Performance Metrics
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setCurrentPage('chat')}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg hover:from-blue-700 hover:to-green-700 transition-all"
+                >
+                  <MessageCircle size={18} />
+                  Back to Chat
+                </button>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    darkMode ? 'hover:bg-gray-700 text-yellow-400' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Analytics Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* System Status Card */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6`}>
+              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                System Status
+              </h2>
+              <div className="space-y-3">
+                <MetricCard 
+                  label="Status" 
+                  value={isOnline ? "Online" : "Offline"} 
+                  icon={isOnline ? <CheckCircle className="text-green-500" size={18} /> : <AlertCircle className="text-red-500" size={18} />}
+                  darkMode={darkMode}
+                />
+                <MetricCard label="Uptime" value={formatUptime(metrics.uptime)} darkMode={darkMode} />
+                <MetricCard label="Active Connections" value={metrics.activeConnections} darkMode={darkMode} />
+              </div>
+            </div>
+
+            {/* Request Analytics Card */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6`}>
+              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Request Analytics
+              </h2>
+              <div className="space-y-3">
+                <MetricCard label="Total Requests" value={metrics.totalRequests} darkMode={darkMode} />
+                <MetricCard label="Avg Response Time" value={`${metrics.avgResponseTime}ms`} darkMode={darkMode} />
+                <MetricCard label="Success Rate" value={`${metrics.successRate}%`} darkMode={darkMode} />
+              </div>
+            </div>
+
+            {/* Resource Usage Card */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6`}>
+              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Resource Usage
+              </h2>
+              <div className="space-y-4">
+                <MetricBar label="Memory" value={metrics.memoryUsage} darkMode={darkMode} />
+                <MetricBar label="CPU" value={metrics.cpuUsage} darkMode={darkMode} />
+              </div>
+            </div>
+
+            {/* Test Coverage Card */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6 md:col-span-2 lg:col-span-3`}>
+              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Test Coverage
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {['Unit', 'Integration', 'System', 'Performance', 'Load', 'Stress'].map(test => (
+                  <TestBadge key={test} label={test} status="passing" darkMode={darkMode} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Chat Page
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-green-50'} transition-colors duration-300`}>
+    <div className={`h-screen flex flex-col ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-green-50'}`}>
       {/* Disclaimer Modal */}
       {showDisclaimer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -169,8 +302,8 @@ const HaleAIFrontend = () => {
       )}
 
       {/* Header */}
-      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b shadow-sm sticky top-0 z-40`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b shadow-sm`}>
+        <div className="max-w-full px-6">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center gap-4">
               <div className="bg-gradient-to-br from-blue-600 to-green-600 p-3 rounded-xl">
@@ -181,13 +314,12 @@ const HaleAIFrontend = () => {
                   HaleAI Medical Assistant
                 </h1>
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Powered by Google Gemini & RAG Technology
+                  Powered RAG Technology
                 </p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Status Indicator */}
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
                 <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -195,18 +327,16 @@ const HaleAIFrontend = () => {
                 </span>
               </div>
 
-              {/* Metrics Button */}
               <button
-                onClick={() => setShowMetrics(!showMetrics)}
-                className={`p-2 rounded-lg transition-colors ${
+                onClick={() => setCurrentPage('analytics')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                   darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
                 }`}
-                title="View Metrics"
               >
-                <Activity size={20} />
+                <BarChart3 size={20} />
+                <span className="hidden sm:inline">Analytics</span>
               </button>
 
-              {/* Dark Mode Toggle */}
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className={`p-2 rounded-lg transition-colors ${
@@ -220,144 +350,137 @@ const HaleAIFrontend = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Chat Section */}
-          <div className="lg:col-span-2">
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl overflow-hidden flex flex-col h-[calc(100vh-200px)]`}>
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.length === 0 && (
-                  <div className="text-center py-12">
-                    <MessageSquare className={`mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} size={48} />
-                    <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Welcome to HaleAI
-                    </h3>
-                    <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Ask me any medical question to get started
-                    </p>
-                  </div>
-                )}
-
-                {messages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-6 py-4 ${
-                      msg.role === 'user' 
-                        ? 'bg-gradient-to-r from-blue-600 to-green-600 text-white'
-                        : msg.isError
-                        ? darkMode ? 'bg-red-900 text-red-200' : 'bg-red-50 text-red-900'
-                        : darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'
-                    }`}>
-                      {msg.isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                          </div>
-                          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Thinking...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-gray-300">
-                              <p className="text-xs font-semibold mb-1">📚 Sources: {msg.sources.length} references</p>
-                            </div>
-                          )}
-                          {msg.timestamp && (
-                            <p className="text-xs mt-2 opacity-70">
-                              {msg.timestamp.toLocaleTimeString()}
+      {/* Main Chat Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sources Sidebar */}
+        <div className={`w-80 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r overflow-y-auto`}>
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="text-blue-600" size={24} />
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Sources
+              </h2>
+            </div>
+            
+            {selectedSources.length === 0 ? (
+              <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <FileText size={48} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No sources yet</p>
+                <p className="text-xs mt-1">Ask a question to see references</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selectedSources.map((source, idx) => (
+                  <div 
+                    key={idx}
+                    className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-blue-600 font-bold text-sm">#{idx + 1}</span>
+                      <div className="flex-1">
+                        <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'} mb-1`}>
+                          Reference {idx + 1}
+                        </h3>
+                        <p className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'} line-clamp-3`}>
+                          {source.content || source.text || source}
+                        </p>
+                        {source.metadata && (
+                          <div className="mt-2 pt-2 border-t border-gray-300">
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {source.metadata.source || 'Medical Database'}
                             </p>
-                          )}
-                        </>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
-                <div ref={messagesEndRef} />
               </div>
+            )}
+          </div>
+        </div>
 
-              {/* Input */}
-              <div className={`border-t ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'} p-4`}>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    placeholder="Ask a medical question..."
-                    disabled={!isOnline || isLoading}
-                    className={`flex-1 px-4 py-3 rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                    } ${(!isOnline || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!isOnline || isLoading || !input.trim()}
-                    className="bg-gradient-to-r from-blue-600 to-green-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-semibold"
-                  >
-                    <Send size={18} />
-                    Send
-                  </button>
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center py-12">
+                  <MessageSquare className={`mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} size={48} />
+                  <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Welcome to HaleAI
+                  </h3>
+                  <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Ask me any medical question to get started
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {messages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-6 py-4 ${
+                    msg.role === 'user' 
+                      ? 'bg-gradient-to-r from-blue-600 to-green-600 text-white'
+                      : msg.isError
+                      ? darkMode ? 'bg-red-900 text-red-200' : 'bg-red-50 text-red-900'
+                      : darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-900'
+                  }`}>
+                    {msg.isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                        </div>
+                        <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Thinking...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <MarkdownText text={msg.content} />
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-opacity-30 border-gray-300">
+                            <p className="text-xs font-semibold">📚 {msg.sources.length} sources referenced</p>
+                          </div>
+                        )}
+                        {msg.timestamp && (
+                          <p className="text-xs mt-2 opacity-70">
+                            {msg.timestamp.toLocaleTimeString()}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
-          {/* Metrics Panel */}
-          <div className={`${showMetrics ? 'block' : 'hidden lg:block'}`}>
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-6 space-y-6`}>
-              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
-                <Activity size={24} className="text-blue-600" />
-                Performance Metrics
-              </h2>
-
-              {/* System Status */}
-              <div className="space-y-3">
-                <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'} uppercase`}>
-                  System Status
-                </h3>
-                <MetricCard 
-                  label="Status" 
-                  value={isOnline ? "Online" : "Offline"} 
-                  icon={isOnline ? <CheckCircle className="text-green-500" size={18} /> : <AlertCircle className="text-red-500" size={18} />}
-                  darkMode={darkMode}
-                />
-                <MetricCard label="Uptime" value={formatUptime(metrics.uptime)} darkMode={darkMode} />
-                <MetricCard label="Active Connections" value={metrics.activeConnections} darkMode={darkMode} />
-              </div>
-
-              {/* Request Metrics */}
-              <div className="space-y-3">
-                <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'} uppercase`}>
-                  Request Analytics
-                </h3>
-                <MetricCard label="Total Requests" value={metrics.totalRequests} darkMode={darkMode} />
-                <MetricCard label="Avg Response Time" value={`${metrics.avgResponseTime}ms`} darkMode={darkMode} />
-                <MetricCard label="Success Rate" value={`${metrics.successRate}%`} darkMode={darkMode} />
-              </div>
-
-              {/* Resource Usage */}
-              <div className="space-y-3">
-                <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'} uppercase`}>
-                  Resource Usage
-                </h3>
-                <MetricBar label="Memory" value={metrics.memoryUsage} darkMode={darkMode} />
-                <MetricBar label="CPU" value={metrics.cpuUsage} darkMode={darkMode} />
-              </div>
-
-              {/* Test Types */}
-              <div className="space-y-3">
-                <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-600'} uppercase`}>
-                  Test Coverage
-                </h3>
-                {['Unit', 'Integration', 'System', 'Performance', 'Load', 'Stress'].map(test => (
-                  <TestBadge key={test} label={test} status="passing" darkMode={darkMode} />
-                ))}
-              </div>
+          {/* Input */}
+          <div className={`border-t ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} p-6`}>
+            <div className="max-w-4xl mx-auto flex gap-3">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                placeholder="Ask about symptoms, medications, treatments, or health conditions..."
+                disabled={!isOnline || isLoading}
+                className={`flex-1 px-6 py-4 rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-lg ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                } ${(!isOnline || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!isOnline || isLoading || !input.trim()}
+                className="bg-gradient-to-r from-blue-600 to-green-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-semibold"
+              >
+                <Send size={20} />
+                <span className="hidden sm:inline">Send</span>
+              </button>
             </div>
           </div>
         </div>
@@ -398,11 +521,11 @@ const MetricBar = ({ label, value, darkMode }) => (
 );
 
 const TestBadge = ({ label, status, darkMode }) => (
-  <div className={`flex items-center justify-between p-2 rounded-lg ${
+  <div className={`flex flex-col items-center justify-center p-4 rounded-lg ${
     darkMode ? 'bg-gray-700' : 'bg-gray-50'
   }`}>
-    <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
-    <span className={`text-xs px-2 py-1 rounded-full ${
+    <span className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
+    <span className={`text-xs px-3 py-1 rounded-full ${
       status === 'passing' 
         ? 'bg-green-100 text-green-800' 
         : 'bg-red-100 text-red-800'
